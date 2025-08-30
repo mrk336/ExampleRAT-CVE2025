@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ExampleRAT-CVE2025 – Red Team Simulation Tool</title>
+  <style>
+    body {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      margin: 40px;
+      line-height: 1.6;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    h1, h2, h3 {
+      color: #222;
+    }
+    code {
+      background-color: #eee;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.95em;
+    }
+    pre {
+      background-color: #eee;
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+    section {
+      margin-bottom: 40px;
+    }
+    details {
+      margin-top: 10px;
+      margin-bottom: 20px;
+    }
+    summary {
+      font-weight: bold;
+      cursor: pointer;
+    }
+    a {
+      color: #0066cc;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>ExampleRAT-CVE2025</h1>
+  <p>A modular Remote Access Tool (RAT) written in C# for red team simulation and malware analysis.</p>
+
+  <section>
+    <h2>Disclaimer</h2>
+    <p>This project is intended strictly for research and educational use. It simulates malware behavior to help security professionals understand threat mechanics. Do not deploy this code in unauthorized systems.</p>
+  </section>
+
+  <section>
+    <h2>Why I Built This</h2>
+    <p>I wanted to explore how threat actors design modular malware that can persist, evade detection, and execute payloads dynamically. This project helped me understand key concepts in Windows internals, encryption, and sandbox evasion. It also gave me a chance to practice writing clean, secure code for offensive tooling.</p>
+  </section>
+
+  <section>
+    <h2>How It Works</h2>
+
+    <details>
+      <summary>Key Derivation</summary>
+      <p>Uses PBKDF2 with SHA-512 and 10,000 iterations to derive a 256-bit AES key from a passphrase.</p>
+      <p><strong>Limitation:</strong> No salt is used, which weakens cryptographic strength. A random salt should be added in production.</p>
+    </details>
+
+    <details>
+      <summary>Payload Decryption</summary>
+      <p>Each payload is stored as a Base64 string and decrypted using AES-CBC. The first 16 bytes are used as the IV.</p>
+      <p><strong>Limitation:</strong> The code slices 15 bytes for the IV, which is incorrect. AES requires a full 16-byte IV.</p>
+    </details>
+
+    <details>
+      <summary>Persistence Module</summary>
+      <p>Decrypted payload is written to a temp file and executed via WMIExec.</p>
+      <p><strong>Limitation:</strong> Assumes WMIExec.exe is present. No fallback or validation.</p>
+    </details>
+
+    <details>
+      <summary>Sandbox Evasion</summary>
+      <p>Introduces a randomized delay (2–8 seconds) to mimic human-like behavior and evade sandbox detection.</p>
+      <p><strong>Limitation:</strong> Basic technique. Could be improved with virtualization checks or user interaction simulation.</p>
+    </details>
+
+    <details>
+      <summary>Exfiltration Module</summary>
+      <p>Same structure: decrypt, write, execute.</p>
+      <p><strong>Limitation:</strong> No actual exfiltration logic implemented. Placeholder only.</p>
+    </details>
+
+    <details>
+      <summary>Sandbox Detection Module</summary>
+      <p>Final payload execution simulates sandbox detection.</p>
+      <p><strong>Limitation:</strong> No actual detection logic included.</p>
+    </details>
+  </section>
+
+  <section>
+    <h2>Sample Payloads</h2>
+    <p>You can replace the embedded Base64 strings with your own encrypted binaries. Example using OpenSSL:</p>
+    <pre>openssl enc -aes-256-cbc -in payload.exe -out encrypted.bin -K &lt;key&gt; -iv &lt;iv&gt;</pre>
+    <p>Then convert the encrypted binary to Base64 and embed it in the code.</p>
+  </section>
+
+  <section>
+    <h2>How to Run</h2>
+    <pre>
+git clone https://github.com/mrk336/ExampleRAT-CVE2025
+cd ExampleRAT-CVE2025
+dotnet build
+    </pre>
+    <p><strong>Note:</strong> WMIExec.exe must be available in your system path.</p>
+  </section>
+
+  <section>
+    <h2>Learn More</h2>
+    <ul>
+      <li><a href="https://www.linkedin.com/in/mark-anthony-mallia-14115561" target="_blank">LinkedIn Profile</a></li>
+      <li><a href="https://github.com/mrk336/network-scanner" target="_blank">Network Scanner Project</a></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Final Thoughts</h2>
+    <p>This project reflects my interest in ethical hacking, threat simulation, and secure offensive tooling. It’s designed to be readable, modular, and safe for research environments. If you're a recruiter or security team looking for someone who understands both the offensive and defensive sides of cybersecurity, I’d love to connect.</p>
+  </section>
+
+</body>
+</html>
